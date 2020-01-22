@@ -69,19 +69,28 @@ void RecView::OnInitialUpdate()
 
 BOOL RecView::OnPreparePrinting(CPrintInfo* pInfo)
 {
-	// default preparation
-	
-	pInfo->SetMaxPage(1);	
+	// default preparation	
 	return DoPreparePrinting(pInfo);
 }
 
 void RecView::OnBeginPrinting(CDC* pDC, CPrintInfo* pInfo)
 {	
+	int height = pDC->GetDeviceCaps(VERTRES);
+
+	CRecordset rsCount(m_pSet->m_pDatabase);
+	rsCount.Open(CRecordset::forwardOnly, "SELECT count(*) as counter FROM [User]", CRecordset::executeDirect);
+	CDBVariant strValue;
+	if (!rsCount.IsEOF())
+		rsCount.GetFieldValue((short)0, strValue );
+	long nCount = strValue.m_iVal;
+
+	int ofset = 15; 	//Ofset is here to lower the number of records per page
+	CSize fontSize = pDC->GetTextExtent("ID");
+	perPage = (height / fontSize.cy)-ofset;
+	pInfo->SetMaxPage((nCount/perPage)+1);
 }
 
-void RecView::OnEndPrinting(CDC* /*pDC*/, CPrintInfo* /*pInfo*/)
-{
-}
+void RecView::OnEndPrinting(CDC*/* pDC*/, CPrintInfo* /*pInfo*/){}
 
 void RecView::OnPrint(CDC* pDC, CPrintInfo* PInfo)
 {
@@ -90,35 +99,47 @@ void RecView::OnPrint(CDC* pDC, CPrintInfo* PInfo)
 	int xPos = width / 10;
 	int yPos = height / 10;
 	CSize fontSize = pDC->GetTextExtent("ID");
+
+	CString header;
+	header.Format("Test document");
+	pDC->DrawText(header, PInfo->m_rectDraw, DT_LEFT | DT_CENTER | DT_SINGLELINE);
+
+	CString footer;
+	footer.Format("Page %d of %d", PInfo->m_nCurPage, PInfo->GetMaxPage());
+	pDC->DrawText(footer, PInfo->m_rectDraw, DT_RIGHT | DT_BOTTOM | DT_SINGLELINE);
 	
 	pDC->TextOut(xPos, yPos, "Id");
 	pDC->TextOut(xPos * 2, yPos, "Name");
 	pDC->TextOut(xPos * 4, yPos, "Manager");
 	yPos += fontSize.cy * 2;
 	pDC->MoveTo(xPos, yPos);
-	pDC->LineTo(xPos * 6, yPos);	
+	pDC->LineTo(xPos * 6, yPos);
+	
+	
 
 	Set rs;
 	rs.Open();
-
-	while (!rs.IsEOF()) 
+	int counter = 0;	
+	rs.Move(perPage * (PInfo->m_nCurPage - 1));
+	
+	while (counter <= perPage || rs.IsEOF() )
 	{
-		CString id;			
-		id.Format("%d", rs.m_id);			
+		
+		CString id;
+		id.Format("%d", rs.m_id);
 		yPos += fontSize.cy;
 		pDC->TextOut(xPos, yPos, id);
 		pDC->TextOut(xPos * 2, yPos, rs.m_name);
-		
+	
 		if (rs.m_manager)
 		{
 			pDC->TextOut(xPos * 4, yPos, 'x');
 		}
 
 		rs.MoveNext();
-	}
-	CString footer;
-	footer.Format("Page %d of %d", PInfo->m_nCurPage, PInfo->GetMaxPage());
-	pDC->DrawText(footer, PInfo->m_rectDraw, DT_RIGHT | DT_BOTTOM | DT_SINGLELINE);
+		++counter;
+	}	
+	
 }
 
 /////////////////////////////////////////////////////////////////////////////

@@ -13,6 +13,7 @@ class Set;
 
 class RecView : public CRecordView
 {
+	int perPage;
 protected: // create from serialization only
 	RecView();
 	DECLARE_DYNCREATE(RecView)
